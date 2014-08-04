@@ -1,0 +1,278 @@
+<html>
+	<head>
+		<script src="vue.min.js"></script>
+		<script src="jquery.min.js"></script>
+		<script src="jquery.velocity.min.js"></script>
+		<style>
+			
+			.rows{
+				height: 10px;
+				width: 500px;
+				overflow: hidden;
+			}
+			.picture{
+				
+				display: inline-block;
+				background-size: cover;
+				background-position: center;
+				height: 10px;
+				width: 10px;
+			}
+			.overlay{
+				height: 500px;
+				width: 500px;
+				background-size: 500px 500px;
+				background-position: center;
+				position: absolute;
+				top: 8;
+				left: 8;
+				opacity: .4;
+			}
+			.zoom{
+				height: 50px;
+				width: 50px;
+				background-size: cover;
+				background-position: center;
+				position: absolute;
+				top: 8;
+				left: 8;
+				opacity: 1;
+			}
+		</style>
+	</head>
+	<body>
+		<img src="Grumpy_Cat.jpg" width="0" height="0">
+		
+
+		<script>
+			//Rigging dataSources
+			var rowarray = [];
+			var dataSources = [];
+			var mainImg = 'Grumpy_Cat.jpg';
+			var px = 50;
+			for (var i = 901; i < 1805; i++){
+				if (i < 1000){
+					dataSources.push('beers/beer0' + i + '.jpg');
+				}else{
+					dataSources.push('beers/beer' + i + '.jpg');
+				}
+			}
+			console.log(dataSources.length);
+			var dataBack = dataSources.slice(0);
+
+			var picRow = Vue.extend({
+				tagName: 'div',
+				className: 'rows'
+			});
+
+			var picPix = Vue.extend({
+				tagName: 'div',
+				className: 'picture',
+				//template: '<div class="picture" background="{{image}}"></div>',
+				data: {
+					image: '',
+					left: ''
+				}
+			});
+
+
+
+			var bigOverlay = Vue.extend({
+				tagName: 'div',
+				className: 'overlay'
+
+			});
+			var lilOverlay = Vue.extend({
+				tagName: 'div',
+				className: 'zoom'
+			})
+
+
+			var imageArray = [];
+			var c = document.createElement('canvas');
+			c.className = 'container';
+			//c.height = 50;
+			c.width = 50+(904*20);
+			var ctx = c.getContext('2d');
+			//document.body.appendChild(c);
+
+			//the main picture
+			image = new Image();
+			image.src = mainImg;
+			image.onload = function(){
+				ctx.drawImage(image, 0, 0, px, px);
+			};
+
+			//preload all beers to canvas
+			for (var i = 0; i < dataSources.length; i++){  //dataSources.length
+				(function(_i){
+					
+					imageArray[_i] = new Image();
+					imageArray[_i].className = 'picture';
+					imageArray[_i].src = dataSources[_i];
+
+					imageArray[_i].onload = function(){
+						ctx.drawImage(imageArray[_i], px+(_i*20), 0, 20, 20);
+						console.log('onload func')	
+					};
+				})(i);
+				
+				//preloadImage('beer090' + i + '.jpg', ctx, i*10);	
+			}
+
+			//Defined the main picture
+			// image = new Image();
+			// image.src = 'Grumpy_Cat.jpg';
+			// image.onload = function(){
+			// 	ctx.drawImage(image, 50, 0, 50, 50);
+			// };
+
+			var imgData;
+			var imgPixs = [];
+			var imgBack;
+			$(window).load(function(){
+				console.log('loads!');
+				var r, g, b, p;
+				
+				for (var j = 0; j < dataSources.length; j++){
+					imgData = ctx.getImageData(px+(20*j), 0, 20, 20);
+					r= g= b= p= 0;
+					for (var i = 0; i < imgData.data.length; i+=4){
+						r += imgData.data[i];
+						g += imgData.data[i+1];
+						b += imgData.data[i+2];
+						p++;
+					}
+
+					
+					imgPixs.push({ 'r': r / p, 'g': g / p, 'b': b / p});
+				}
+				imgBack = imgPixs.slice(0);
+				setBigPic();
+				setOverlay();
+				$("div").hover(
+					function(){
+						if ($(this).attr("class") == 'picture'){
+							console.log($(this).attr("class"));//className);
+						
+							var thing = new lilOverlay();
+
+							thing.$el.style.backgroundImage = $(this).css('background-image');
+							thing.$appendTo('body');
+						}
+					},
+					function(){
+						$('.zoom').remove();
+						console.log('out');
+					}
+				);
+			});
+
+			var setBigPic = function(){
+				//var data = ctx.getImageData(0,0, 50, 50);
+				//ctx.putImageData(data, 50, 0)
+				for (var i = 0; i < px; i++){
+
+					var row = new picRow();
+					var data = ctx.getImageData(0, i, px, 1);
+					//ctx.putImageData(data, 50, i);
+					for (var j = 0; j < data.data.length; j+=4){
+						
+						makePic( data.data[j], data.data[j+1], data.data[j+2], row.$el);
+						
+					}
+
+					row.$appendTo('body');
+				}
+			}
+
+			var makePic = function( r, g, b, row){
+				
+				var thing = getPixs( r, g, b);
+				var pix = new picPix();
+				pix.$el.style.backgroundImage = 'url(' + thing + ')';
+				rowarray.splice(1, 0, pix);
+				pix.$appendTo(row);
+			}
+			var pixel = 1;
+			var getPixs = function( red, green, blue){
+				pixel++;
+
+				var score = -1;
+				var best;
+				if (imgPixs.length === 0){
+					console.log('reset');
+					imgPixs = imgBack.slice(0);
+					dataSources = dataBack.slice(0);
+				}
+				var ctr;
+				for (var p = 0; p < dataSources.length; p++){//dataSources.length; p++){
+					if (score === -1){
+						best = dataSources[p];
+						ctr = 0;
+						score = compareScore(imgPixs[p], red, green, blue);
+					}else{
+						
+						//ctr++;
+						if (compareScore(imgPixs[p], red, green, blue) < score){
+							best = dataSources[p];
+							score = compareScore(imgPixs[p], red, green, blue);
+							ctr = p;
+							if (score === 0 ) break;
+						}
+					}
+				}
+				
+				if (score > 116 && imgPixs.length < imgBack.length){
+					
+					imgPixs = [];
+					return getPixs(red, green, blue);
+				}
+				imgPixs.splice(ctr, 1);
+				dataSources.splice(ctr, 1);
+				return best;
+			};
+			
+			var compareScore = function(pixObj, r, g, b){
+				
+				rval = Math.abs(pixObj.r - r);
+				gval = Math.abs(pixObj.g - g);
+				
+				bval = Math.abs(pixObj.b - b);
+				//console.log(aval);
+				return rval + gval + bval;
+			};
+
+			var setOverlay = function(){
+				var over = new bigOverlay();
+				over.$el.style.backgroundImage = 'url(' + mainImg + ')';
+				console.log(rowarray);
+				over.$appendTo('body');
+			}
+				// imgData = ctx.getImageData(0, 0, 10, 10);
+				// for (var i = 0; i < imgData.data.length; i+=4){
+				// 	console.log(imgData.data[i] + ' ' + imgData.data[i+1] + ' ' +imgData.data[i+2] + ' ' +imgData.data[i+3])
+				// }
+			//}
+			
+
+			//var img = new Image();
+			//img.src = 'beer0901.jpg';
+			// var c = document.createElement('canvas');
+			// c.height = 277;
+			// c.width = 220;
+			// var ctx = c.getContext('2d');
+			// var th = 0;
+			// var imgonload = function(){
+			// 	ctx.drawImage(img, th, 0);
+			// }
+			
+			// document.body.appendChild(c);
+			
+
+			
+
+
+		</script>
+	</body>
+</html>
